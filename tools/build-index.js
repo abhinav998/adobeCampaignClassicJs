@@ -25,15 +25,22 @@ const TEXT_CAP = 6000;
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 const lines = (s) => s.split(/\r?\n/);
+// Number of lines as editors and `wc -l` count them (a final newline does not start a new line)
+const lineCount = (s) => s.split(/\r?\n/).length - (/\r?\n$/.test(s) ? 1 : 0);
 
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", rarr: "→", larr: "←", harr: "↔", mdash: "—", ndash: "–", hellip: "…", copy: "©" };
 function decode(s) {
   return s
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
     .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
-    .replace(/&([a-z]+);/gi, (m, n) => ENTITIES[n.toLowerCase()] ?? m);
+    .replace(/&([a-z]+);/gi, (m, n) => ENTITIES[n.toLowerCase()] ?? m)
+    .replace(/&(amp|lt|gt|quot|nbsp)(?![a-z;])/gi, (m, n) => ENTITIES[n.toLowerCase()]); // legacy entities without ";"
 }
-const stripTags = (s) => decode(s.replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+const stripLiquid = (s) => s.replace(/\{%[\s\S]*?%\}/g, " ").replace(/\{\{[\s\S]*?\}\}/g, " ");
+const tidy = (s) => s.replace(/\s+/g, " ").replace(/\s+([.,;:!?)])/g, "$1").replace(/\(\s+/g, "(").trim();
+// Strip tags, decode entities, then strip any tags that were written escaped in the source (e.g. &lt;b&gt;)
+const stripTags = (s) => tidy(decode(stripLiquid(s).replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ")).replace(/<\/?[a-z][^>]*>/gi, ""));
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s);
 
 function githubUrl(p, line) {
@@ -93,7 +100,7 @@ function htmlDoc(p) {
     }
   });
   const clean = body.replace(/<!--[\s\S]*?-->/g, "");
-  const firstP = [...clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => stripTags(m[1])).find((t) => t.length > 20);
+  const firstP = [...clean.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)].map((m) => stripTags(m[1])).find((t) => t.length > 20);
   const text = stripTags(clean.replace(/<pre[\s\S]*?<\/pre>/gi, (m) => " " + m + " "));
   return {
     title: decode(data.title || path.basename(p, ".html")),
@@ -122,15 +129,18 @@ function markdownDoc(p) {
     }
     if (!l.trim()) { if (buf.length) { paras.push(buf.join(" ")); buf = []; } return; }
     if (/^\s*(>|\||---|<)/.test(l) && !buf.length) return;
+    const li = l.match(/^\s*(?:[-*+]|\d+\.)\s+(?:\[[ x]\]\s+)?(.*)$/i);
+    if (li) { buf.push((buf.length ? "; " : "") + li[1].trim()); return; }
     buf.push(l.trim());
   });
   if (buf.length) paras.push(buf.join(" "));
+  for (let i = 0; i < paras.length; i++) paras[i] = paras[i].replace(/\s+;/g, ";");
   const md = (s) => s.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[`*_]/g, "");
   const title = headings.find((h) => h.lvl === 1)?.t || data.name || path.basename(p);
   const firstPara = paras.find((x) => x.length > 30) || paras[0] || "";
   return {
     title,
-    summary: clip(md(data.description || firstPara), 260),
+    summary: clip(tidy(md(data.description || firstPara)), 260),
     headings,
     text: clip(md(body.replace(/\s+/g, " ")), TEXT_CAP),
     data,
@@ -164,13 +174,15 @@ function testOutline(src) {
   const out = [];
   const names = [];
   let count = 0;
+  let each = 0;
   lines(src).forEach((l, i) => {
-    const d = l.match(/^(\s*)describe(?:\.\w+)?\(\s*(["'`])(.*?)\2/);
+    const d = l.match(/^(\s*)describe(?:\.\w+)?\s*\(\s*(["'`])(.*?)\2/);
     if (d) out.push({ t: d[3], l: i + 1, lvl: Math.min(3, 1 + Math.floor(d[1].length / 4)) });
-    const t = l.match(/^\s*(?:it|test)(?:\.\w+)?\(\s*(["'`])(.*?)\1/);
+    const t = l.match(/^\s*(?:it|test)(?:\.(?:only|skip|concurrent))?\s*\(\s*(["'`])(.*?)\1/);
     if (t) { count++; names.push(t[2]); }
+    else if (/^\s*(?:it|test)\.each\s*\(/.test(l)) { count++; each++; }
   });
-  return { headings: out.slice(0, 200), count, names };
+  return { headings: out.slice(0, 200), count, each, names };
 }
 
 function sampleInfo(src) {
@@ -182,9 +194,14 @@ function sampleInfo(src) {
     const lb = l.match(/^\s*labels:\s*\[(.*)\]/);
     if (lb) lb[1].split(",").forEach((x) => { x = x.trim().replace(/^["']|["']$/g, ""); if (x) labels.add(x); });
   });
-  const c = src.match(/require\(["']\.\/utils\.js["']\);?\s*\/\*([\s\S]*?)\*\//);
+  // The description is the last block comment before the code starts (some files start with a copied, unrelated banner)
+  const codeStart = src.search(/\(\s*async\s*\(|utils\.logon\(/);
+  const head = codeStart === -1 ? src : src.slice(0, codeStart);
+  const comment = [...head.matchAll(/\/\*([\s\S]*?)\*\//g)].map((m) => m[1]).filter((c) => !/Copyright|Licensed/i.test(c)).pop();
   const banner = src.match(/This sample illustrates[^\n`]*/);
-  const summary = c ? c[1].replace(/^\s*\*\s?/gm, "").replace(/\s+/g, " ").trim() : banner ? banner[0].trim() : "";
+  const clean = (c) => lines(c).map((l) => l.replace(/^\s*\*+\s?/, "").trim()).filter((l) => l && !/^[-*]+$/.test(l))
+    .map((l, i) => (/^-\s+/.test(l) ? (i ? "; " : "") + l.replace(/^-\s+/, "") : (i ? " " : "") + l)).join("").replace(/\s+;/g, ";").trim();
+  const summary = comment ? clean(comment) : banner ? banner[0].trim() : "";
   return { headings, labels: [...labels], summary };
 }
 
@@ -193,45 +210,45 @@ function sampleInfo(src) {
 // ---------------------------------------------------------------------------
 
 const SRC_DESC = {
-  "src/index.js": "SDK entry point. Defines the SDK class and its public surface: init(), getSDKVersion(), escapeXtk(), escapeForLike(), expandXPath(), ip(), and re-exports the main classes.",
+  "src/index.js": "SDK entry point. Exports the sdk object: init(), getSDKVersion(), ip(), escapeXtk(), escapeForLike(), expandXPath(), unexpandXPath() and xtkConstText(), plus the XtkCaster, DomUtil, Credentials, ConnectionParameters, HttpError and TestUtil classes.",
   "src/client.js": "Heart of the SDK (2400+ lines). The Client class, ConnectionParameters and Credentials; the NLWS proxy that turns client.NLWS.xtkQueryDef.create() into SOAP calls; logon/logoff, session state, observers, caches and API dispatch via _callMethod().",
   "src/soap.js": "SoapMethodCall: builds SOAP request envelopes, sends them through the transport layer and parses responses and SOAP faults back into JavaScript values.",
   "src/domUtil.js": "DOM and XML helpers: parsing and serializing XML, traversal, XPath helpers, and conversions between XML and JSON (SimpleJson and BadgerFish). Uses JSDOM under Node.js.",
   "src/xtkCaster.js": "XtkCaster: converts values between Campaign (XTK) types and JavaScript types — strings, numbers, booleans, dates, timespans, memos and more.",
   "src/transport.js": "Isomorphic HTTP transport: axios under Node.js, fetch in the browser. Defines HttpError.",
-  "src/application.js": "The Application object and the XtkSchema object model (schemas, nodes, keys, enumerations, links), plus the schema cache and current-login helpers.",
-  "src/campaign.js": "CampaignException with its SDK-0000xx error codes, and Campaign constants such as delivery action types.",
+  "src/application.js": "The Application object and the schema object model (XtkSchema, XtkSchemaNode, XtkSchemaKey, XtkJoin, XtkEnumeration), plus SchemaCache and CurrentLogin.",
+  "src/campaign.js": "CampaignException and its SDK-0000xx error codes, plus constants for Campaign enumerations (delivery states and message types, workflow states, task statuses, operations, offers and more).",
   "src/cache.js": "Generic Cache base class and SafeStorage, a wrapper around localStorage-like stores used to persist caches.",
   "src/methodCache.js": "Caches SOAP method definitions (from schemas) so method signatures are not fetched on every call.",
   "src/optionCache.js": "Caches xtk:option values read through getOption().",
-  "src/xtkEntityCache.js": "Caches XTK entities such as schemas and forms fetched from the server.",
-  "src/cacheRefresher.js": "Background refresher that polls the server for cache invalidations and keeps the SDK caches up to date.",
+  "src/xtkEntityCache.js": "In-memory cache of XTK entities fetched from the server, such as schemas (keyed like \"xtk:schema|nms:recipient\").",
+  "src/cacheRefresher.js": "Refreshes a cache at a regular interval by asking the server for recently modified entities (xtk:session#GetModifiedEntities, Campaign 8.4 and above). Started with client.startRefreshCaches().",
   "src/entityAccessor.js": "EntityAccessor: reads attributes and child elements from entities regardless of their representation (XML DOM, SimpleJson or BadgerFish).",
-  "src/xtkJob.js": "XtkJobInterface: helpers to run and follow asynchronous XTK jobs (start, poll status, read logs and results).",
-  "src/crypto.js": "Cipher used to encrypt and decrypt Campaign passwords and secrets under Node.js, with a browser stub.",
-  "src/util.js": "Miscellaneous utilities (Util, ArrayMap): browser detection, schema id / namespace mapping, array helpers and more.",
-  "src/testUtil.js": "TestUtil: helpers exposed for writing tests against the SDK, such as creating schema objects from XML.",
+  "src/xtkJob.js": "XtkJobInterface: runs long-running XTK jobs (execute or submit), then reads their status, progress, logs and result, and can pause or cancel them.",
+  "src/crypto.js": "Cipher (Node.js only): encrypts and decrypts Campaign passwords with the instance key from the XtkSecretKey or XtkKey option (AES-256-CBC).",
+  "src/util.js": "Utilities: Util (browser detection, redacting sensitive text with trim(), schema id ↔ namespace mapping, UUIDs, promise helpers) and the ArrayMap collection.",
+  "src/testUtil.js": "TestUtil: helpers for writing tests against the SDK. newSchema() builds a schema object from XML.",
   "src/web/bundler.js": "Minimal module loader (define/require) used by compile.js to package the SDK into a single browser bundle.",
 };
 
 const META_DESC = {
   ".eslintrc.js": "ESLint configuration for the source code (npm run lint).",
   ".gitignore": "Files and folders git ignores (node_modules, coverage, build output…).",
-  "babel.config.js": "Babel configuration used by Jest to transpile the code under test.",
-  "compile.js": "Builds the browser bundle: concatenates the src/ modules in dependency order around the web bundler.",
+  "babel.config.js": "Babel configuration Jest uses (through babel-jest) to transpile JavaScript for the current Node.js version, including ES-module dependencies of jsdom.",
+  "compile.js": "Builds the browser bundle dist/bundle.js by concatenating the src/ modules, in dependency order, around the web bundler.",
   "jsdoc.json": "JSDoc configuration for generating the API reference (npm run jsdoc).",
   "package-lock.json": "Exact, locked versions of every npm dependency.",
   ".github/ISSUE_TEMPLATE.md": "Template for new GitHub issues: expected vs actual behaviour, steps to reproduce, platform and version.",
   "COPYRIGHT": "Copyright notice for the project.",
   "LICENSE": "Apache License 2.0 — the terms under which the SDK is distributed.",
   "openspec/config.yaml": "Configuration for OpenSpec, the spec-driven change workflow used with AI coding assistants.",
-  "test/jest.config.js": "Jest configuration: test roots, coverage thresholds and reporters.",
-  "test/mock.js": "Mock Campaign server responses (logon, schemas, options…) shared by the unit tests.",
-  "samples/utils.js": "Helpers shared by every sample: reads the connection settings, logs on, and runs/prints each sample.",
+  "test/jest.config.js": "Jest configuration: coverage of src/ with 100% thresholds for branches, lines and statements, the jest-junit reporter, and Babel transforms.",
+  "test/mock.js": "Canned Campaign SOAP responses (logon, schemas, options, queries…) that the unit tests use in place of a real server.",
+  "samples/utils.js": "Helpers shared by the samples: reads the ACC_URL, ACC_USER and ACC_PASSWORD environment variables, logs on, and runs and prints each sample.",
   "docs/_config.yml": "Jekyll configuration of the documentation site (title, base URL, plugins, collections).",
   "docs/Gemfile": "Ruby gems needed to build the documentation site locally with Jekyll.",
   "docs/Gemfile.lock": "Locked Ruby gem versions for the documentation site.",
-  "docs/.gitignore": "Files git ignores inside docs/ (Jekyll build output).",
+  "docs/.gitignore": "Files git ignores inside docs/: Jekyll build output and caches.",
   "docs/_data/navigation.yml": "The documentation site's left-hand menu: every section and page, in order.",
   "docs/_includes/navigation.html": "Jekyll include that renders the navigation menu from navigation.yml.",
   "docs/_layouts/default.html": "Base page layout of the documentation site (header, menu, footer).",
@@ -241,8 +258,13 @@ const META_DESC = {
   "docs/assets/css/styles.css": "Stylesheet of the documentation site.",
   "docs/assets/images/adobe-campaign-256.png": "Adobe Campaign logo used on the documentation site.",
   "docs/assets/images/architecture.png": "SDK architecture diagram shown on the Architecture page.",
-  "docs/assets/images/ref.svg": "Icon used by the documentation site.",
+  "docs/assets/images/ref.svg": "Icon shown before cross-reference notes (p.ref) on the documentation site.",
   "docs/favicon.png": "Favicon of the documentation site.",
+  ".github/PULL_REQUEST_TEMPLATE.md": "Template for new pull requests: description, related issue, motivation, testing, type of change and a checklist.",
+  "CLAUDE.md": "Tells Claude Code to read AGENTS.md (the file only contains @AGENTS.md).",
+  "src/CLAUDE.md": "Tells Claude Code to read src/AGENTS.md (the file only contains @AGENTS.md).",
+  "test/CLAUDE.md": "Tells Claude Code to read test/AGENTS.md (the file only contains @AGENTS.md).",
+  "docs/blog.html": "Lists the blog posts with their author, date and excerpt.",
   "docs/404.html": "\"Page not found\" page of the documentation site.",
   "index.html": "This page: an interactive directory of everything in the repository.",
   "tools/build-index.js": "Generator for this page. Re-run `node tools/build-index.js` after changing the repository.",
@@ -250,6 +272,28 @@ const META_DESC = {
 };
 
 // Manual relationships between documentation pages, source, tests and samples
+const WORKFLOWS = {
+  ".github/workflows/codeql-analysis.yml": {
+    summary: "GitHub Actions workflow that runs CodeQL security analysis on the JavaScript code.",
+    facts: [
+      ["Triggers", "Pushes and pull requests to master, a weekly schedule (Thursdays 13:34 UTC), and manual runs"],
+      ["In this repository", "The default branch is main, so the push and pull-request triggers never fire. The weekly schedule and manual runs do run, on main."],
+    ],
+  },
+  ".github/workflows/npm-publish.yml": {
+    summary: "GitHub Actions workflow that publishes the package to npm, and tags the release, when a commit whose message starts with “Release x.y.z” is pushed to master.",
+    facts: [
+      ["Triggers", "Pushes to master"],
+      ["In this repository", "The default branch is main, so this workflow never runs."],
+    ],
+  },
+};
+
+const SAMPLE_DESC = {
+  // The file's own header comment ("server version") does not describe it
+  "samples/020 - encryption.js": "Encrypts and hashes a password with the xtk:session APIs (Encrypt, EncryptPassword, EncryptServerPassword, HashPassword, ReEncryptPassword).",
+};
+
 const RELATED = {
   "docs/connecting.html": ["src/client.js", "test/credentials.test.js", "test/imBearerToken.test.js", "samples/000 - basics - logon.js"],
   "docs/connectionParameters.html": ["src/client.js", "test/credentials.test.js"],
@@ -262,7 +306,6 @@ const RELATED = {
   "docs/architecture.html": ["src/index.js", "compile.js", "src/web/bundler.js", "docs/assets/images/architecture.png"],
   "docs/xtkSession.html": ["src/client.js", "samples/000 - basics - logon.js"],
   "docs/xtkQueryDef.html": ["src/client.js", "samples/001 - basics - queries.js"],
-  "docs/profiles.html": ["samples/001 - basics - queries.js"],
   "docs/xtkWrite.html": ["samples/004 - basics - writer.js"],
   "docs/xtkOption.html": ["src/optionCache.js", "src/client.js"],
   "docs/xtkPackage.html": ["test/client.hasPackage.test.js", "samples/011 - basics - packages.js"],
@@ -285,7 +328,7 @@ const RELATED = {
   "docs/httpHeaders.html": ["src/client.js", "src/transport.js"],
   "docs/transport.html": ["src/transport.js", "test/transport.test.js"],
   "docs/observability.html": ["src/client.js", "test/observability.test.js"],
-  "docs/dynamicInvoke.html": ["src/client.js", "test/xtkProxy.test.js"],
+  "docs/dynamicInvoke.html": ["src/client.js"],
   "docs/entityAccessor.html": ["src/entityAccessor.js", "test/entityAccessor.test.js"],
   "docs/passwords.html": ["src/crypto.js", "test/crypto.test.js", "samples/020 - encryption.js"],
   "docs/samples.html": ["samples/utils.js", "samples/000 - basics - logon.js"],
@@ -315,7 +358,7 @@ const RELATED = {
 // ---------------------------------------------------------------------------
 
 const CATS = {
-  docs: { label: "Docs", hint: "Documentation site pages and blog posts" },
+  docs: { label: "Docs", hint: "Documentation site: pages, blog posts and the files that build the site" },
   src: { label: "Source", hint: "SDK source modules in src/" },
   tests: { label: "Tests", hint: "Jest unit tests in test/" },
   samples: { label: "Samples", hint: "Runnable examples in samples/" },
@@ -342,7 +385,7 @@ files.sort();
 
 const items = {};
 function add(p, gid, extra) {
-  const stat = fs.existsSync(path.join(ROOT, p)) ? fs.statSync(path.join(ROOT, p)) : { size: 0 };
+  const stat = p !== "index.html" && fs.existsSync(path.join(ROOT, p)) ? fs.statSync(path.join(ROOT, p)) : { size: null };
   const it = {
     id: p,
     path: p,
@@ -413,12 +456,12 @@ for (const p of docPages) {
   add(p, gid, {
     title: n ? n.label : d.title,
     subtitle: n && n.label !== d.title ? d.title : null,
-    summary: d.summary,
+    summary: META_DESC[p] || d.summary,
     headings: d.headings,
     text: d.text,
     site: SITE + (name === "index.html" ? "" : name),
     kind: "Doc page",
-    facts: [["Menu section", n ? (nav.find((x) => x.children.some((c) => "docs/" + c.link === p) || x.link === name)?.name || "—") : "Not in menu"]].concat(d.headings.length ? [["Sections", String(d.headings.length)]] : []),
+    facts: [["Menu section", n ? (nav.find((x) => x.children.some((c) => "docs/" + c.link === p))?.name || "Top level") : "Not in menu"]].concat(d.headings.length ? [["Sections", String(d.headings.length)]] : []),
   });
 }
 
@@ -426,14 +469,16 @@ for (const p of files.filter((f) => f.startsWith("docs/_posts/"))) {
   const d = htmlDoc(p);
   const date = path.basename(p).slice(0, 10);
   const tags = (d.data.tags || "").split(/\s+/).filter(Boolean);
+  const cats = (d.data.categories || d.data.category || "").split(/\s+/).filter(Boolean).map((c) => c.toLowerCase());
+  const slug = path.basename(p, path.extname(p)).slice(11);
+  const postUrl = SITE + [...cats, ...date.split("-"), slug + ".html"].join("/");
   add(p, "blog", {
     title: d.title,
     summary: d.summary,
     headings: d.headings,
     text: d.text,
     tags,
-    site: SITE + "blog.html",
-    siteLabel: "Blog on docs site",
+    site: postUrl,
     kind: "Blog post",
     date,
     facts: [["Published", date], ["Author", d.data.author || "—"]].concat(d.data.categories ? [["Category", d.data.categories]] : []),
@@ -443,7 +488,14 @@ for (const p of files.filter((f) => f.startsWith("docs/_posts/"))) {
 // 2) Source
 for (const p of files.filter((f) => /^src\/.*\.js$/.test(f))) {
   const src = read(p);
-  const exp = jsExports(src);
+  let exp = jsExports(src);
+  const def = src.match(/module\.exports\s*=\s*([A-Za-z_$][\w$]*)\s*;/);
+  if (!exp.length && def) {
+    const cls = src.match(/class\s+\w+\s*\{([\s\S]*?)\n  \}/);
+    const methods = cls ? [...cls[1].matchAll(/^\s{4}(?:async\s+)?([a-z][\w$]*)\s*\(/gm)].map((m) => m[1] + "()").filter((m) => m !== "constructor()") : [];
+    const props = [...src.matchAll(new RegExp(`${def[1]}\\.([A-Za-z_$][\\w$]*)\\s*=`, "g"))].map((m) => m[1]);
+    exp = [...new Set([...methods, ...props])];
+  }
   add(p, "src", {
     title: path.basename(p),
     summary: SRC_DESC[p] || "",
@@ -451,7 +503,7 @@ for (const p of files.filter((f) => /^src\/.*\.js$/.test(f))) {
     tags: exp,
     text: clip(exp.join(" ") + " " + jsComments(src), TEXT_CAP),
     kind: "Source module",
-    facts: [["Lines", String(lines(src).length)], ["Exports", exp.length ? exp.slice(0, 12).join(", ") + (exp.length > 12 ? ` +${exp.length - 12} more` : "") : "—"]],
+    facts: [["Lines", String(lineCount(src))], [def && !jsExports(src).length ? `Exports (${def[1]})` : "Exports", exp.length ? exp.slice(0, 12).join(", ") + (exp.length > 12 ? ` +${exp.length - 12} more` : "") : "—"]],
   });
 }
 
@@ -462,11 +514,11 @@ for (const p of files.filter((f) => /^test\/.*\.test\.js$/.test(f))) {
   const suites = o.headings.filter((h) => h.lvl === 1).map((h) => h.t);
   add(p, "tests", {
     title: path.basename(p),
-    summary: `Jest suite${suites.length > 1 ? "s" : ""} ${suites.map((s) => `“${s}”`).join(", ") || ""} — ${o.count} test cases in ${o.headings.length} describe blocks.`,
+    summary: `Jest suite${suites.length > 1 ? "s" : ""} ${suites.map((s) => `“${s}”`).join(", ")}: ${plural(o.count, "test")}${o.each ? ` (${o.each} of them table-driven)` : ""} in ${plural(o.headings.length, "describe block")}.`,
     headings: o.headings,
     text: clip(o.headings.map((h) => h.t).join(" · ") + " · " + o.names.join(" · "), TEXT_CAP),
     kind: "Test suite",
-    facts: [["Test cases", String(o.count)], ["Describe blocks", String(o.headings.length)], ["Lines", String(lines(src).length)]],
+    facts: [["Tests", String(o.count) + (o.each ? ` (${o.each} table-driven)` : "")], ["Describe blocks", String(o.headings.length)], ["Lines", String(lineCount(src))]],
   });
 }
 
@@ -474,19 +526,19 @@ for (const p of files.filter((f) => /^test\/.*\.test\.js$/.test(f))) {
 for (const p of files.filter((f) => f.startsWith("samples/") && f !== "samples/utils.js")) {
   const src = read(p);
   if (p.endsWith(".html")) {
-    add(p, "samples", { title: path.basename(p), summary: "Browser version of the logon sample: loads the SDK bundle in a web page and logs on to Campaign.", kind: "Sample (browser)", text: stripTags(src).slice(0, 2000), facts: [["Lines", String(lines(src).length)]] });
+    add(p, "samples", { title: path.basename(p), summary: "Browser version of the logon sample: loads the SDK bundle in a web page and logs on to Campaign.", kind: "Sample (browser)", text: stripTags(src).slice(0, 2000), facts: [["Lines", String(lineCount(src))]] });
     continue;
   }
   const s = sampleInfo(src);
   const name = path.basename(p, ".js");
   add(p, "samples", {
     title: name.replace(/^(\d+) - /, "$1 · ").replace(/ - /g, " · "),
-    summary: s.summary.replace(/\.?$/, ".") + (s.headings.length ? ` Contains ${s.headings.length} samples.` : ""),
+    summary: (SAMPLE_DESC[p] || (s.summary ? s.summary.replace(/\.?$/, ".") : "")) + (s.headings.length ? ` Contains ${plural(s.headings.length, "sample")}.` : ""),
     headings: s.headings,
     tags: s.labels,
     text: clip(s.headings.map((h) => h.t).join(" · ") + " " + s.labels.join(" "), TEXT_CAP),
     kind: "Sample",
-    facts: [["Samples", String(s.headings.length)], ["Run", `node "${p}"`]],
+    facts: [["Samples", String(s.headings.length)], ["Run", `node "${p}"`], ["Needs", "ACC_URL, ACC_USER and ACC_PASSWORD environment variables"]],
   });
 }
 
@@ -524,13 +576,12 @@ for (const p of files) {
   } else if (/^\.github\/workflows\/.*\.ya?ml$/.test(p)) {
     const y = read(p);
     const name = (y.match(/^name:\s*"?([^"\n]+)"?/m) || [])[1] || path.basename(p);
-    const branches = (y.match(/branches:\s*\[?\s*([^\]\n]+)/) || [])[1] || "";
     add(p, gid, {
       ...base,
       title: `Workflow: ${name}`,
       subtitle: p,
-      summary: name === "CodeQL" ? "GitHub Actions workflow that runs CodeQL security analysis on the JavaScript code." : "GitHub Actions workflow that publishes the package to npm when a “Release x.y.z” commit lands.",
-      facts: [["Triggers on branch", branches.replace(/[[\]\s-]/g, " ").trim() || "—"], ["Note", "This repository's default branch is main, so the workflow does not run until it is updated."]],
+      summary: (WORKFLOWS[p] || {}).summary || "",
+      facts: (WORKFLOWS[p] || {}).facts || [],
       headings: lines(y).map((l, i) => { const m = l.match(/^\s{0,4}-?\s*name:\s*(.+)$/); return m ? { t: m[1].replace(/^["']|["']$/g, ""), l: i + 1, lvl: 2 } : null; }).filter(Boolean),
       kind: "CI workflow",
     });
@@ -547,7 +598,7 @@ for (const p of files) {
       headings,
       kind: { png: "Image", svg: "Image", css: "Stylesheet", yml: "YAML", yaml: "YAML", json: "JSON", js: "JavaScript", html: "HTML" }[ext] || "File",
       site: p === "docs/404.html" ? SITE + "404.html" : null,
-      image: ["png", "svg"].includes(ext) ? `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${p.split("/").map(encodeURIComponent).join("/")}` : null,
+      image: ["png", "svg"].includes(ext) ? p.split("/").map(encodeURIComponent).join("/") : null,
     });
   }
 }
@@ -590,5 +641,5 @@ const data = {
 
 const json = JSON.stringify(data).replace(/</g, "\\u003c");
 const template = read("tools/index.template.html");
-fs.writeFileSync(path.join(ROOT, "index.html"), template.replace("/*__DATA__*/null", () => json));
+fs.writeFileSync(path.join(ROOT, "index.html"), template.replace("/*__DATA__*/null", () => json).replace(/__REPO_URL__/g, `https://github.com/${REPO}`));
 console.log(`index.html: ${Object.keys(items).length} files in ${data.groups.length} sections (${(json.length / 1024).toFixed(0)} KB of data)`);

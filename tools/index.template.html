@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -66,7 +66,9 @@ kbd { font: 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--border
 /* ---------- App shell ---------- */
 .app { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; height: 100dvh; }
 .top { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; text-decoration: none; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand h1 a { text-decoration: none; }
+.brand h1 a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .logo { width: 34px; height: 34px; border-radius: 8px; background: var(--accent); color: #fff; display: grid; place-items: center; font: 700 12px/1 var(--sans); letter-spacing: .02em; flex: none; }
 .brand h1 { font-size: 15px; margin: 0; white-space: nowrap; }
 .brand small { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; }
@@ -138,8 +140,8 @@ kbd { font: 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--border
 
 .section { margin-bottom: 26px; }
 .section-head { display: flex; align-items: baseline; gap: 10px; padding: 6px 0 10px; position: sticky; top: -18px; background: var(--bg); z-index: 2; }
-.section-head button { border: 0; background: none; padding: 0; display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
 .section-head h2 { font-size: 15px; margin: 0; }
+.section-head button { border: 0; background: none; padding: 0; display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font: inherit; font-weight: 700; }
 .section-head .chev { width: 14px; height: 14px; color: var(--faint); transform: rotate(90deg); transition: transform .15s; }
 .section.collapsed .section-head .chev { transform: rotate(0); }
 .section-head .count { color: var(--faint); font-size: 12px; }
@@ -175,11 +177,13 @@ kbd { font: 11px/1 var(--mono); padding: 3px 5px; border: 1px solid var(--border
 
 /* ---------- Files view ---------- */
 .ftree { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; font-size: 13px; }
-.frow { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; cursor: pointer; min-width: 0; }
+.frow { display: flex; align-items: center; gap: 6px; padding: 0 8px 0 0; border-radius: 6px; min-width: 0; }
+.fbtn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 3px 0 3px 8px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 6px; }
+.fsp { width: 13px; flex: none; }
 .frow:hover { background: var(--surface-2); }
 .frow.sel { background: var(--cs); }
 .frow .chev { width: 13px; height: 13px; color: var(--faint); transition: transform .15s; flex: none; }
-.frow.open .chev { transform: rotate(90deg); }
+.frow.open .fbtn .chev { transform: rotate(90deg); }
 .frow .ficon { width: 15px; height: 15px; flex: none; color: var(--c, var(--faint)); }
 .frow .fname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .frow.dir .fname { font-weight: 600; }
@@ -253,6 +257,7 @@ dialog h3 { margin: 0 0 12px; }
 dialog table { width: 100%; border-collapse: collapse; font-size: 13px; }
 dialog td { padding: 6px 0; border-bottom: 1px solid var(--border); }
 dialog td:first-child { white-space: nowrap; padding-right: 16px; }
+.dialog-actions { margin: 14px 0 0; text-align: right; }
 .scrim { display: none; }
 
 /* ---------- Responsive ---------- */
@@ -288,25 +293,25 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
 <body>
 <div class="app">
   <header class="top">
-    <button class="icon-btn menu-btn" id="menuBtn" aria-label="Show sections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-    <a class="brand" href="#" id="home">
+    <button type="button" class="icon-btn menu-btn" id="menuBtn" aria-label="Show sections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <div class="brand">
       <span class="logo" aria-hidden="true">ACC</span>
-      <span><h1>ACC JS SDK Directory</h1><small id="brandSub"></small></span>
-    </a>
+      <div><h1><a href="#" id="home" title="Back to the full directory">ACC JS SDK Directory</a></h1><small id="brandSub"></small></div>
+    </div>
     <div class="search" id="searchWrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <label class="sr-only" for="q">Search the repository</label>
       <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Search pages, headings, APIs, files…  e.g. queryDef, timeout, persist">
-      <span class="right"><button class="clear" id="clearQ" aria-label="Clear search">×</button><kbd>/</kbd></span>
+      <span class="right"><button type="button" class="clear" id="clearQ" aria-label="Clear search">×</button><kbd>/</kbd></span>
     </div>
     <div class="top-actions">
       <div class="seg" role="group" aria-label="View">
-        <button id="viewTopics" aria-pressed="true">Topics</button>
-        <button id="viewFiles" aria-pressed="false">Files</button>
+        <button type="button" id="viewTopics" aria-pressed="true">Topics</button>
+        <button type="button" id="viewFiles" aria-pressed="false">Files</button>
       </div>
-      <button class="icon-btn" id="themeBtn" aria-label="Toggle light/dark theme" title="Toggle theme (t)"></button>
-      <button class="icon-btn hide-sm" id="helpBtn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
-      <a class="icon-btn hide-sm" id="repoLink" target="_blank" rel="noopener" title="Open the repository on GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+      <button type="button" class="icon-btn" id="themeBtn" aria-label="Toggle light/dark theme" title="Toggle theme (t)"></button>
+      <button type="button" class="icon-btn hide-sm" id="helpBtn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+      <a class="icon-btn hide-sm" id="repoLink" href="__REPO_URL__" target="_blank" rel="noopener" title="Open the repository on GitHub"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
     </div>
   </header>
   <div class="bar" id="chips" role="group" aria-label="Filter by category"></div>
@@ -321,6 +326,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
 <dialog id="help">
   <h3>Keyboard shortcuts</h3>
   <table>
+    <tbody>
     <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
     <tr><td><kbd>↓</kbd> <kbd>↑</kbd> or <kbd>j</kbd> <kbd>k</kbd></td><td>Move through results</td></tr>
     <tr><td><kbd>Enter</kbd></td><td>Open the selected topic (docs site if it has one, else GitHub)</td></tr>
@@ -331,8 +337,9 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     <tr><td><kbd>f</kbd></td><td>Switch between Topics and Files views</td></tr>
     <tr><td><kbd>t</kbd></td><td>Toggle light / dark theme</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Clear search / close panels</td></tr>
+    </tbody>
   </table>
-  <p style="margin:14px 0 0;text-align:right"><button class="btn" onclick="this.closest('dialog').close()">Close</button></p>
+  <p class="dialog-actions"><button type="button" class="btn" id="helpClose">Close</button></p>
 </dialog>
 
 <script id="repo-data" type="application/json">/*__DATA__*/null</script>
@@ -408,7 +415,8 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
 
   // ---------- Text helpers ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const norm = (s) => String(s ?? "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  // Lower-case one UTF-16 unit at a time so indexes match the original string (needed for highlighting)
+  const norm = (s) => { s = String(s ?? ""); let o = ""; for (let i = 0; i < s.length; i++) { const l = s[i].toLowerCase(); o += l.length === 1 ? l : s[i]; } return o; };
   function hl(str, tokens) {
     str = String(str ?? "");
     if (!tokens.length) return esc(str);
@@ -432,7 +440,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     return it.github + (md ? "?plain=1" : "") + "#L" + line;
   }
   const primaryUrl = (it) => it.site || it.github;
-  const fmtSize = (n) => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB";
+  const fmtSize = (n) => n == null ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB";
 
   // ---------- Search index ----------
   const IDX = {};
@@ -449,19 +457,25 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     };
   }
   function tokenize(q) { return norm(q).split(/[\s,]+/).map((t) => t.replace(/^["']|["']$/g, "")).filter(Boolean); }
+  // true when t starts a word in s (after a non-letter/digit, e.g. "xtk:persist" for "persist")
+  function wordStart(s, t) { let i = s.indexOf(t); while (i !== -1) { if (i === 0 || !/[a-z0-9]/.test(s[i - 1])) return true; i = s.indexOf(t, i + 1); } return false; }
   function score(id, tokens) {
     const x = IDX[id];
     let s = 0;
     for (const t of tokens) {
-      let ts = 0;
-      if (x.title.includes(t)) ts += x.title.startsWith(t) || x.title.includes(" " + t) ? 14 : 10;
-      if (x.path.includes(t)) ts += 6;
-      if (x.tags.includes(t)) ts += 5;
-      if (x.headsAll.includes(t)) ts += 4;
-      if (x.summary.includes(t)) ts += 3;
-      if (x.text.includes(t)) ts += 1;
-      if (!ts) return 0;
-      s += ts;
+      // Each word scores by its best field; other matching fields only break ties
+      const hits = [];
+      if (x.title.includes(t)) hits.push(wordStart(x.title, t) ? 14 : 10);
+      if (x.path.includes(t)) hits.push(6);
+      if (x.tags.includes(t)) hits.push(5);
+      if (x.headsAll.includes(t)) hits.push(4);
+      if (x.summary.includes(t)) hits.push(3);
+      if (x.text.includes(t)) hits.push(1);
+      if (!hits.length) return 0;
+      const best = Math.max(...hits);
+      s += best + 0.1 * (hits.reduce((a, b) => a + b, 0) - best);
+      // Doc pages are the main topics: prefer them when a title matches
+      if (ITEMS[id].cat === "docs" && hits[0] >= 10 && x.title.includes(t)) s += 2;
     }
     if (tokens.length > 1 && x.title.includes(tokens.join(" "))) s += 10;
     if (ITEMS[id].lowRank) s *= 0.25;
@@ -485,7 +499,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     chipsEl.innerHTML = CAT_ORDER.map((c, i) => {
       const label = c === "all" ? "All" : DATA.cats[c].label;
       const hint = c === "all" ? "Everything in the repository" : DATA.cats[c].hint;
-      return `<button class="chip" data-cat="${c}" aria-pressed="${state.cat === c}" title="${esc(hint)} (${i + 1})"><span class="dot"></span>${label}<span class="n">${counts[c] || 0}</span></button>`;
+      return `<button type="button" class="chip" data-cat="${c}" aria-pressed="${state.cat === c}" title="${esc(hint)} (${i + 1})"><span class="dot"></span>${label}<span class="n">${counts[c] || 0}</span></button>`;
     }).join("") + `<span class="status" id="status"></span>`;
     const shown = state.cat === "all" ? counts.all : (counts[state.cat] || 0);
     $("#status").textContent = r.tokens.length ? `${shown} result${shown === 1 ? "" : "s"} for “${state.q.trim()}”` : `${ALL.length} files · v${DATA.version} · indexed ${DATA.generated}`;
@@ -563,14 +577,14 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     const actions = [];
     if (it.site) actions.push(`<a class="link-btn primary" href="${esc(it.site)}" target="_blank" rel="noopener">${ICON.globe}${esc(it.siteLabel || "Docs site")}</a>`);
     actions.push(`<a class="link-btn${it.site ? "" : " primary"}" href="${esc(it.github)}" target="_blank" rel="noopener">${ICON.gh}GitHub</a>`);
-    return `<div class="card${id === state.sel ? " sel" : ""}" data-id="${esc(id)}" data-cat="${it.cat}" tabindex="0" role="button" aria-label="${esc(it.title)} — show details">
+    return `<article class="card${id === state.sel ? " sel" : ""}" data-id="${esc(id)}" data-cat="${it.cat}" tabindex="0" aria-label="${esc(it.title)}">
       <div class="card-top"><a class="card-title" href="${esc(primaryUrl(it))}" target="_blank" rel="noopener" title="Open ${it.site ? "on the docs site" : "on GitHub"}">${hl(it.title, t)}${ICON.ext}</a><span class="kind">${esc(it.kind)}</span></div>
       <div class="path" title="${esc(it.path)}">${hl(it.path, t)}</div>
       ${showGroup ? `<div class="group-label">${esc(GROUP[it.group].label)}</div>` : ""}
       ${it.summary ? `<p class="sum">${hl(it.summary, t)}</p>` : ""}
       ${extra}
       <div class="card-actions">${actions.join("")}</div>
-    </div>`;
+    </article>`;
   }
 
   const mainEl = $("#main");
@@ -581,7 +595,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
       const counts = {};
       ALL.forEach((id) => { counts[ITEMS[id].cat] = (counts[ITEMS[id].cat] || 0) + 1; });
       html += `<div class="hero"><div><h2>${state.cat === "all" ? "Everything in the repository" : esc(DATA.cats[state.cat].label)}</h2><p>${state.cat === "all" ? `Every page, module, test, sample and project file of the ACC JavaScript SDK (v${esc(DATA.version)}). Click a title to open it, or a card to preview its outline and related files.` : esc(DATA.cats[state.cat].hint) + "."}</p></div>
-        <div class="stats">${CAT_ORDER.slice(1).map((c) => `<button class="stat" data-cat="${c}" data-setcat="${c}"><b>${counts[c] || 0}</b><span>${esc(DATA.cats[c].label)}</span></button>`).join("")}</div></div>`;
+        <div class="stats">${CAT_ORDER.slice(1).map((c) => `<button type="button" class="stat" data-cat="${c}" data-setcat="${c}"><b>${counts[c] || 0}</b><span>${esc(DATA.cats[c].label)}</span></button>`).join("")}</div></div>`;
       const vis = [];
       for (const g of DATA.groups) {
         const ids = g.items.filter(inCat);
@@ -589,7 +603,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
         const col = state.collapsed.has(g.id);
         if (!col) vis.push(...ids);
         html += `<section class="section${col ? " collapsed" : ""}" id="sec-${g.id}" data-cat="${g.cat}">
-          <div class="section-head"><button type="button" data-collapse="${g.id}" aria-expanded="${!col}">${ICON.chev}<h2>${esc(g.label)}</h2></button><span class="count">${ids.length}</span><span class="desc">${esc(g.desc)}</span></div>
+          <div class="section-head"><h2><button type="button" data-collapse="${g.id}" aria-expanded="${!col}">${ICON.chev}${esc(g.label)}</button></h2><span class="count">${ids.length}</span><span class="desc">${esc(g.desc)}</span></div>
           <div class="cards">${ids.map((id) => cardHtml(id, r, false)).join("")}</div></section>`;
       }
       state.visible = vis;
@@ -598,7 +612,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
       state.visible = ids;
       if (!ids.length) {
         const other = Object.keys(r.matches).length;
-        html = `<div class="empty-state"><b>No matches${state.cat !== "all" ? " in " + esc(DATA.cats[state.cat].label) : ""}</b>${other ? `${other} match${other === 1 ? "" : "es"} in other categories. <button class="link-btn" data-setcat="all">Show all categories</button>` : "Try fewer or different words, e.g. a schema name (xtk:queryDef), an API (persist) or a file name."}</div>`;
+        html = `<div class="empty-state"><b>No matches${state.cat !== "all" ? " in " + esc(DATA.cats[state.cat].label) : ""}</b>${other ? `${other} match${other === 1 ? "" : "es"} in other categories. <button type="button" class="link-btn" data-setcat="all">Show all categories</button>` : "Try fewer or different words, e.g. a schema name (xtk:queryDef), an API (persist) or a file name."}</div>`;
       } else {
         html = `<section class="section"><div class="cards">${ids.map((id) => cardHtml(id, r, true)).join("")}</div></section>`;
       }
@@ -635,20 +649,20 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
         if (!c) continue;
         const open = tokens.length || state.cat !== "all" || state.dirsOpen.has(d.path);
         const treeUrl = `${DATA.repoUrl}/tree/${DATA.branch}/${d.path.split("/").map(encodeURIComponent).join("/")}`;
-        out += `<div class="frow dir${open ? " open" : ""}" data-dir="${esc(d.path)}" role="button" tabindex="0" aria-expanded="${!!open}">${ICON.chev}${ICON.folder}<span class="fname">${hl(d.name, tokens)}/</span><span class="fdesc">${esc(DIR_DESC[d.path] || "")}</span><span class="fmeta">${c}</span><a class="go" href="${esc(treeUrl)}" target="_blank" rel="noopener" title="Open folder on GitHub">${ICON.gh}</a></div>`;
+        out += `<div class="frow dir${open ? " open" : ""}" data-dir="${esc(d.path)}"><button type="button" class="fbtn" aria-expanded="${!!open}">${ICON.chev}${ICON.folder}<span class="fname">${hl(d.name, tokens)}/</span><span class="fdesc">${esc(DIR_DESC[d.path] || "")}</span><span class="fmeta">${c}</span></button><a class="go" href="${esc(treeUrl)}" target="_blank" rel="noopener" title="Open folder on GitHub" aria-label="Open ${esc(d.path)} on GitHub">${ICON.gh}</a></div>`;
         out += `<div class="fchildren"${open ? "" : " hidden"}>${dirHtml(d)}</div>`;
       }
       for (const id of n.files.filter(inCat).sort()) {
         const it = ITEMS[id];
         vis.push(id);
-        out += `<div class="frow file${id === state.sel ? " sel" : ""}" data-id="${esc(id)}" data-cat="${it.cat}" role="button" tabindex="0"><span style="width:13px;flex:none"></span>${ICON.file}<span class="fname">${hl(id.split("/").pop(), tokens)}</span><span class="fdesc">${hl(it.title !== id.split("/").pop() ? it.title : it.summary, tokens)}</span><span class="fmeta">${fmtSize(it.size)}</span><a class="go" href="${esc(primaryUrl(it))}" target="_blank" rel="noopener" title="Open ${it.site ? "on the docs site" : "on GitHub"}">${it.site ? ICON.globe : ICON.gh}</a></div>`;
+        out += `<div class="frow file${id === state.sel ? " sel" : ""}" data-id="${esc(id)}" data-cat="${it.cat}"><button type="button" class="fbtn"><span class="fsp"></span>${ICON.file}<span class="fname">${hl(id.split("/").pop(), tokens)}</span><span class="fdesc">${hl(it.title !== id.split("/").pop() ? it.title : it.summary, tokens)}</span><span class="fmeta">${fmtSize(it.size)}</span></button><a class="go" href="${esc(primaryUrl(it))}" target="_blank" rel="noopener" title="Open ${it.site ? "on the docs site" : "on GitHub"}" aria-label="Open ${esc(id)} ${it.site ? "on the docs site" : "on GitHub"}">${it.site ? ICON.globe : ICON.gh}</a></div>`;
       }
       return out;
     }
     const body = dirHtml(TREE);
     state.visible = vis;
     mainEl.innerHTML = `<div class="hero"><div><h2>Repository files</h2><p>The real folder structure of <a href="${esc(DATA.repoUrl)}" target="_blank" rel="noopener">${esc(DATA.repo)}</a>. Click a file to preview it; use the icon on the right to open it.</p></div>
-      <div class="stats"><button class="stat" data-cat="all" id="expandAll"><b>+</b><span>Expand all</span></button><button class="stat" data-cat="all" id="collapseAll"><b>−</b><span>Collapse all</span></button></div></div>
+      <div class="stats"><button type="button" class="stat" data-cat="all" id="expandAll"><b>+</b><span>Expand all</span></button><button type="button" class="stat" data-cat="all" id="collapseAll"><b>−</b><span>Collapse all</span></button></div></div>
       ${body ? `<div class="ftree">${body}</div>` : `<div class="empty-state"><b>No files match</b>Try a different search or category.</div>`}`;
   }
 
@@ -665,18 +679,18 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     const it = ITEMS[id];
     const g = GROUP[it.group];
     const tokens = tokenize(state.q);
-    const facts = (it.facts || []).concat([["Size", fmtSize(it.size)]]);
+    const facts = (it.facts || []).concat(it.size == null ? [] : [["Size", fmtSize(it.size)]]);
     const many = (it.headings || []).length > 12;
     const rel = it.related || [];
     const RMAX = 6;
-    const relatedBlock = rel.length ? `<h4>Related <span class="n">${rel.length}</span></h4><div class="related" id="relList">${rel.map((r, i) => relHtml(r, i >= RMAX)).join("")}${rel.length > RMAX ? `<button class="link-btn more" id="relMore">Show all ${rel.length}</button>` : ""}</div>` : "";
+    const relatedBlock = rel.length ? `<h4>Related <span class="n">${rel.length}</span></h4><div class="related" id="relList">${rel.map((r, i) => relHtml(r, i >= RMAX)).join("")}${rel.length > RMAX ? `<button type="button" class="link-btn more" id="relMore">Show all ${rel.length}</button>` : ""}</div>` : "";
     const relatedFirst = !["src", "tests", "samples"].includes(it.cat);
     const outlineLabel = it.cat === "src" ? "Classes & functions" : it.cat === "tests" ? "Describe blocks" : it.cat === "samples" ? "Samples in this file" : "Outline";
     pvEl.innerHTML = `<div class="pv" data-cat="${it.cat}">
-      <div class="pv-head"><span class="kind">${esc(it.kind)}</span><span class="grp">${esc(g.label)}</span><button class="icon-btn pv-close" id="pvClose" aria-label="Close preview">${ICON.x}</button></div>
+      <div class="pv-head"><span class="kind">${esc(it.kind)}</span><span class="grp">${esc(g.label)}</span><button type="button" class="icon-btn pv-close" id="pvClose" aria-label="Close preview">${ICON.x}</button></div>
       <h2>${hl(it.title, tokens)}</h2>
       ${it.subtitle && it.subtitle !== it.path ? `<div class="sub">${esc(it.subtitle)}</div>` : ""}
-      <div class="pth"><span>${esc(it.path)}</span><button data-copy="${esc(it.path)}" title="Copy path" aria-label="Copy path">${ICON.copy}</button><button data-copylink="${esc(id)}" title="Copy link to this topic" aria-label="Copy link to this topic">${ICON.link}</button></div>
+      <div class="pth"><span>${esc(it.path)}</span><button type="button" data-copy="${esc(it.path)}" title="Copy path" aria-label="Copy path">${ICON.copy}</button><button type="button" data-copylink="${esc(id)}" title="Copy link to this topic" aria-label="Copy link to this topic">${ICON.link}</button></div>
       <div class="pv-actions">
         ${it.site ? `<a class="btn solid" href="${esc(it.site)}" target="_blank" rel="noopener">${ICON.globe}${esc(it.siteLabel || "Open on docs site")}</a>` : ""}
         <a class="btn${it.site ? "" : " solid"}" href="${esc(it.github)}" target="_blank" rel="noopener">${ICON.gh}Open on GitHub</a>
@@ -684,8 +698,8 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
       </div>
       ${it.summary ? `<p class="summary">${hl(it.summary, tokens)}</p>` : ""}
       ${it.image ? `<img class="shot" src="${esc(it.image)}" alt="${esc(it.title)}" loading="lazy" onerror="this.remove()">` : ""}
-      <dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${/^(npm run|Run)/.test(k) ? `<code>${esc(v)}</code>` : esc(v)}</dd>`).join("")}</dl>
-      ${(it.tags || []).length ? `<h4>${it.cat === "src" ? "Exports" : it.cat === "meta" ? "Packages" : "Tags"} <span class="n">${it.tags.length}</span></h4><div class="tags">${it.tags.map((t) => `<button class="tag" data-search="${esc(t)}" title="Search for “${esc(t)}”">${esc(t)}</button>`).join("")}</div>` : ""}
+      <dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${/^(npm run|Run$)/.test(k) ? `<code>${esc(v)}</code>` : esc(v)}</dd>`).join("")}</dl>
+      ${(it.tags || []).length ? `<h4>${it.cat === "src" ? "Exports" : it.cat === "meta" ? "Packages" : "Tags"} <span class="n">${it.tags.length}</span></h4><div class="tags">${it.tags.map((t) => `<button type="button" class="tag" data-search="${esc(t)}" title="Search for “${esc(t)}”">${esc(t)}</button>`).join("")}</div>` : ""}
       ${relatedFirst ? relatedBlock : ""}
       ${(it.headings || []).length ? `<h4>${outlineLabel} <span class="n">${it.headings.length}</span></h4>${many ? `<input class="outline-filter" id="outlineFilter" type="search" placeholder="Filter ${it.headings.length} entries…" aria-label="Filter outline">` : ""}
         <ul class="outline" id="outline">${it.headings.map((h) => `<li class="lvl${h.lvl}" data-t="${esc(h.t.toLowerCase())}"><a href="${esc(lineUrl(it, h.l))}" target="_blank" rel="noopener" title="Open line ${h.l} on GitHub"><span class="t">${hl(h.t, tokens)}</span><span class="l">L${h.l}</span></a></li>`).join("")}</ul>` : ""}
@@ -694,7 +708,7 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
   }
   function relHtml(id, hidden) {
     const r = ITEMS[id];
-    return `<button class="rel" data-rel="${esc(id)}" data-cat="${r.cat}"${hidden ? " hidden" : ""}><span class="dot"></span><span><span class="t">${esc(r.title)}</span><span class="p">${esc(r.path)}</span></span></button>`;
+    return `<button type="button" class="rel" data-rel="${esc(id)}" data-cat="${r.cat}"${hidden ? " hidden" : ""}><span class="dot"></span><span><span class="t">${esc(r.title)}</span><span class="p">${esc(r.path)}</span></span></button>`;
   }
   pvEl.addEventListener("input", (e) => {
     if (e.target.id !== "outlineFilter") return;
@@ -743,18 +757,19 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     if (card) select(card.dataset.id, { open: true });
   });
   mainEl.addEventListener("keydown", (e) => {
-    const el = e.target.closest("[data-id],[data-dir]");
-    if (!el || e.target.closest("a") || (e.key !== "Enter" && e.key !== " ")) return;
-    e.preventDefault();
-    if (el.dataset.dir != null) toggleDir(el);
-    else if (e.key === " ") select(el.dataset.id, { open: true });
-    else openItem(el.dataset.id, e.shiftKey ? "github" : "primary");
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest("[data-id]");
+    // Folder buttons toggle natively; links follow natively
+    if (!el || e.target.closest("a")) return;
+    const onFileButton = e.target.classList.contains("fbtn");
+    if (e.key === "Enter") { e.preventDefault(); openItem(el.dataset.id, e.shiftKey ? "github" : "primary"); }
+    else if (!onFileButton) { e.preventDefault(); select(el.dataset.id, { open: true }); }
   });
   function toggleDir(el) {
     const p = el.dataset.dir;
     const open = !el.classList.contains("open");
     el.classList.toggle("open", open);
-    el.setAttribute("aria-expanded", open);
+    el.querySelector(".fbtn").setAttribute("aria-expanded", open);
     el.nextElementSibling.hidden = !open;
     open ? state.dirsOpen.add(p) : state.dirsOpen.delete(p);
     store.set("dirsOpen", [...state.dirsOpen]);
@@ -780,11 +795,13 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
     if (opts.rerender) render(); else {
       document.querySelectorAll(".card.sel, .frow.sel, .tree-items a.sel").forEach((el) => el.classList.remove("sel"));
       document.querySelectorAll(`[data-id="${CSS.escape(id)}"]`).forEach((el) => el.classList.add("sel"));
+      const tg = sideEl.querySelector(`.tree-group[data-g="${CSS.escape(ITEMS[id].group)}"]`);
+      if (tg && !tg.classList.contains("open")) { tg.classList.add("open"); tg.querySelector("button").setAttribute("aria-expanded", "true"); }
       renderPreview();
     }
     if (opts.scroll) {
       const el = mainEl.querySelector(`[data-id="${CSS.escape(id)}"]`);
-      if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus({ preventScroll: true }); }
+      if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); (el.querySelector(".fbtn") || el).focus({ preventScroll: true }); }
     }
     if (opts.open && !canHover.matches) document.body.classList.add("pv-open");
   }
@@ -876,10 +893,10 @@ dialog td:first-child { white-space: nowrap; padding-right: 16px; }
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", paintThemeBtn);
   themeBtn.addEventListener("click", toggleTheme);
   $("#helpBtn").addEventListener("click", () => $("#help").showModal());
+  $("#helpClose").addEventListener("click", () => $("#help").close());
   $("#menuBtn").addEventListener("click", () => document.body.classList.add("side-open"));
   $("#scrim").addEventListener("click", () => { closePreview(); document.body.classList.remove("side-open"); });
   $("#home").addEventListener("click", (e) => { e.preventDefault(); state.sel = null; state.cat = "all"; store.set("cat", "all"); setQuery(""); setView("topics"); renderPreview(); writeHash(); });
-  $("#repoLink").href = DATA.repoUrl;
   $("#brandSub").textContent = `v${DATA.version} · ${DATA.repo}`;
 
   // ---------- Copy & toast ----------
