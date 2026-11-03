@@ -273,6 +273,14 @@ const META_DESC = {
 
 // Manual relationships between documentation pages, source, tests and samples
 const WORKFLOWS = {
+  ".github/workflows/static.yml": {
+    summary: "GitHub Actions workflow that publishes the repository to GitHub Pages, so this directory page is live at https://abhinav998.github.io/adobeCampaignClassicJs/.",
+    facts: [
+      ["Triggers", "Pushes to main, and manual runs"],
+      ["Publishes", "The whole repository as static files (no Jekyll build); index.html is the home page"],
+      ["Site", "https://abhinav998.github.io/adobeCampaignClassicJs/"],
+    ],
+  },
   ".github/workflows/codeql-analysis.yml": {
     summary: "GitHub Actions workflow that runs CodeQL security analysis on the JavaScript code.",
     facts: [
